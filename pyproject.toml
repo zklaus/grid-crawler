@@ -1,0 +1,20 @@
+[build-system]
+requires = [
+  "setuptools >= 40.9.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grid_crawler"
+version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = [
+  "fire",
+  "scikit-image",
+  "scitools-iris",
+  "sqlalchemy",
+  "xxhash",
+]
+
+[project.scripts]
+grid-crawler = "grid_crawler.grid_crawler:main"
