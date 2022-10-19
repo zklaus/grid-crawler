@@ -3,34 +3,33 @@
 
 from pathlib import Path
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
 import fire
-import iris
 
 from . import db
 
 
-def get_grid(candidate):
-    cube = iris.load_cube(candidate)
-    dim_coords = {}
-    non_dim_coords = {}
-    dims = {}
-    for ax in ("x", "y"):
-        axis_dim_coords = cube.coords(axis=ax, dim_coords=True)
-        assert len(axis_dim_coords) == 1
-        dim_coords[ax] = axis_dim_coords[0]
-        dims[ax] = cube.coord_dims(axis_dim_coords[0])[0]
-        axis_non_dim_coords = cube.coords(axis=ax, dim_coords=False)
-        non_dim_coords[ax] = axis_non_dim_coords
-    print(dims)
-    return cube
+def setup_db():
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        echo=True,
+        future=True,
+    )
+    db.Base.metadata.create_all(engine)
+    return engine
 
 
 def crawl(basedir):
+    engine = setup_db()
     basepath = Path(basedir)
     candidates = basepath.glob("**/*.nc")
-    for candidate in candidates:
-        grid = get_grid(candidate)
-        break
+    with Session(engine) as session:
+        for candidate in candidates:
+            filer = db.File(candidate)
+            print(filer)
+            break
 
 
 def main():

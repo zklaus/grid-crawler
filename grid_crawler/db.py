@@ -1,12 +1,23 @@
 # -*- coding: utf-8 -*-
 
-from sqlalchemy import Column, Integer, PickleType, String
+import os
+
+import iris
+from sqlalchemy import Column, ForeignKey, Integer, PickleType, String, Table
 from sqlalchemy.orm import declarative_base, relationship
-from xxhash import xxh3_64_intdigest
+from xxhash import xxh3_64, xxh3_64_intdigest
 
 from .hash import phash_1d, phash_2d
 
 Base = declarative_base()
+
+
+grid_dim_coord = Table(
+    "grid_dim_coord",
+    Base.metadata,
+    Column("grid_id", ForeignKey("grid.id")),
+    Column("dim_coord_id", ForeignKey("dim_coord.id")),
+)
 
 
 class DimCoord(Base):
@@ -21,20 +32,36 @@ class DimCoord(Base):
     bounds_hash = Column(Integer)
     bounds_lower_phash = Column(Integer)
     bounds_upper_phash = Column(Integer)
-    grids = relationship("Grid", back_populates="dim_coords")
 
-    def __init__(self, dim_coord):
-        points = dim_coord.points
-        bounds = dim_coord.bounds
+    def __init__(self, coord):
+        points = coord.points
+        hasher = xxh3_64()
+        hasher.update(points)
+        points_hash = xxh3_64_intdigest(points)
+        bounds = coord.bounds
+        hasher.update(bounds)
+        bounds_hash = xxh3_64_intdigest(bounds)
         super().__init__(
+            hash=hasher.intdigest(),
             points=points,
-            points_hash=xxh3_64_intdigest(points),
+            points_hash=points_hash,
             points_phash=phash_1d(points).hash,
             bounds=bounds,
-            bounds_hash=xxh3_64_intdigest(bounds),
+            bounds_hash=bounds_hash,
             bounds_lower_phash=phash_1d(bounds[:, 0]).hash,
             bounds_upper_phash=phash_1d(bounds[:, 1]).hash,
         )
+
+    def __repr__(self):
+        return f"DimCoord({self.hash})"
+
+
+grid_two_d_coord = Table(
+    "grid_two_d_coord",
+    Base.metadata,
+    Column("grid_id", ForeignKey("grid.id")),
+    Column("two_d_coord_id", ForeignKey("two_d_coord.id")),
+)
 
 
 class TwoDCoord(Base):
@@ -47,27 +74,38 @@ class TwoDCoord(Base):
     points_phash = Column(Integer, nullable=False)
     bounds = Column(PickleType)
     bounds_hash = Column(Integer)
-    grids = relationship("Grid", back_populates="two_d_coords")
 
     def __init__(self, coord):
         points = coord.points
+        hasher = xxh3_64()
+        hasher.update(points)
+        points_hash = xxh3_64_intdigest(points)
         bounds = coord.bounds
+        hasher.update(bounds)
+        bounds_hash = xxh3_64_intdigest(bounds)
         super().__init__(
+            hash=hasher.intdigest(),
             points=points,
-            points_hash=xxh3_64_intdigest(points),
+            points_hash=points_hash,
             points_phash=phash_2d(points).hash,
             bounds=bounds,
-            bounds_hash=xxh3_64_intdigest(bounds),
+            bounds_hash=bounds_hash,
         )
+
+    def __repr__(self):
+        return f"TwoDCoord({self.hash})"
 
 
 class Grid(Base):
     __tablename__ = "grid"
 
     id = Column(Integer, primary_key=True)
-    dim_coords = relationship("DimCoord", back_populates="grids")
-    two_d_coords = relationship("TwoDCoord", back_populates="grids")
-    files = relationship("File", back_populates="grid")
+    dim_coords = relationship("DimCoord",
+                              secondary=grid_dim_coord,
+                              backref="grids")
+    two_d_coords = relationship("TwoDCoord",
+                                secondary=grid_two_d_coord,
+                                backref="grids")
 
     def __init__(self, cube):
         dim_coords = {}
@@ -81,6 +119,9 @@ class Grid(Base):
             axis_non_dim_coords = cube.coords(axis=ax, dim_coords=False)
             non_dim_coords[ax] = axis_non_dim_coords
 
+    def __repr__(self):
+        return f"Grid([{', '.join(self.dim_coords)}])"
+
 
 class File(Base):
     __tablename__ = "file"
@@ -88,4 +129,16 @@ class File(Base):
     id = Column(Integer, primary_key=True)
     filename = Column(String, nullable=False)
     tracking_id = Column(String)
-    grid = relationship("Grid", back_populates="files")
+    grid_id = Column(ForeignKey("grid.id"))
+    grid = relationship("Grid", backref="files")
+
+    def __init__(self, path):
+        cube = iris.load_cube(path)
+        super().__init__(
+            filename=os.path.basename(path),
+            tracking_id=cube.attributes["tracking_id"],
+            grid=Grid(cube),
+        )
+
+    def __repr__(self):
+        return f"File({self.filename}, {self.tracking_id}, {self.grid})"
