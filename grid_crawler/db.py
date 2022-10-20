@@ -34,12 +34,9 @@ class DimCoord(Base):
 
     def __init__(self, coord):
         points = coord.points
-        hasher = xxh3_64()
-        hasher.update(points)
         points_hash = xxh3_64_intdigest(points)
         bounds = coord.bounds
         if bounds is not None:
-            hasher.update(bounds)
             bounds_hash = xxh3_64_intdigest(bounds)
             bounds_lower_phash = phash_1d(bounds[:, 0]).hash
             bounds_upper_phash = phash_1d(bounds[:, 1]).hash
@@ -48,7 +45,6 @@ class DimCoord(Base):
             bounds_lower_phash = None
             bounds_upper_phash = None
         super().__init__(
-            id=hasher.intdigest(),
             points=points,
             points_hash=points_hash,
             points_phash=phash_1d(points).hash,
@@ -82,17 +78,13 @@ class TwoDCoord(Base):
 
     def __init__(self, coord):
         points = coord.points
-        hasher = xxh3_64()
-        hasher.update(points)
         points_hash = xxh3_64_intdigest(points)
         bounds = coord.bounds
         if bounds is not None:
-            hasher.update(bounds)
             bounds_hash = xxh3_64_intdigest(bounds)
         else:
             bounds_hash = None
         super().__init__(
-            id=hasher.intdigest(),
             points=points,
             points_hash=points_hash,
             points_phash=phash_2d(points).hash,
