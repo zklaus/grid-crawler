@@ -14,7 +14,7 @@ from . import db
 
 def setup_db():
     engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
+        "sqlite+pysqlite:///grids.db",
         echo=True,
         future=True,
     )
