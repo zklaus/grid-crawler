@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from itertools import islice
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -26,10 +27,11 @@ def crawl(basedir):
     basepath = Path(basedir)
     candidates = basepath.glob("**/*.nc")
     with Session(engine) as session:
-        for candidate in candidates:
-            filer = db.File(candidate)
+        for candidate in islice(candidates, 10):
+            filer = db.File(candidate, session)
             print(filer)
-            break
+            session.add(filer)
+        session.commit()
 
 
 def main():

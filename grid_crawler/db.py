@@ -24,7 +24,6 @@ class DimCoord(Base):
     __tablename__ = "dim_coord"
 
     id = Column(Integer, primary_key=True)
-    hash = Column(Integer, nullable=False, unique=True)
     points = Column(PickleType, nullable=False)
     points_hash = Column(Integer, nullable=False)
     points_phash = Column(Integer, nullable=False)
@@ -39,21 +38,28 @@ class DimCoord(Base):
         hasher.update(points)
         points_hash = xxh3_64_intdigest(points)
         bounds = coord.bounds
-        hasher.update(bounds)
-        bounds_hash = xxh3_64_intdigest(bounds)
+        if bounds is not None:
+            hasher.update(bounds)
+            bounds_hash = xxh3_64_intdigest(bounds)
+            bounds_lower_phash = phash_1d(bounds[:, 0]).hash
+            bounds_upper_phash = phash_1d(bounds[:, 1]).hash
+        else:
+            bounds_hash = None
+            bounds_lower_phash = None
+            bounds_upper_phash = None
         super().__init__(
-            hash=hasher.intdigest(),
+            id=hasher.intdigest(),
             points=points,
             points_hash=points_hash,
             points_phash=phash_1d(points).hash,
             bounds=bounds,
             bounds_hash=bounds_hash,
-            bounds_lower_phash=phash_1d(bounds[:, 0]).hash,
-            bounds_upper_phash=phash_1d(bounds[:, 1]).hash,
+            bounds_lower_phash=bounds_lower_phash,
+            bounds_upper_phash=bounds_upper_phash,
         )
 
     def __repr__(self):
-        return f"DimCoord({self.hash})"
+        return f"DimCoord({self.id})"
 
 
 grid_two_d_coord = Table(
@@ -68,7 +74,6 @@ class TwoDCoord(Base):
     __tablename__ = "two_d_coord"
 
     id = Column(Integer, primary_key=True)
-    hash = Column(Integer, nullable=False, unique=True)
     points = Column(PickleType, nullable=False)
     points_hash = Column(Integer, nullable=False)
     points_phash = Column(Integer, nullable=False)
@@ -81,10 +86,13 @@ class TwoDCoord(Base):
         hasher.update(points)
         points_hash = xxh3_64_intdigest(points)
         bounds = coord.bounds
-        hasher.update(bounds)
-        bounds_hash = xxh3_64_intdigest(bounds)
+        if bounds is not None:
+            hasher.update(bounds)
+            bounds_hash = xxh3_64_intdigest(bounds)
+        else:
+            bounds_hash = None
         super().__init__(
-            hash=hasher.intdigest(),
+            id=hasher.intdigest(),
             points=points,
             points_hash=points_hash,
             points_phash=phash_2d(points).hash,
@@ -93,7 +101,7 @@ class TwoDCoord(Base):
         )
 
     def __repr__(self):
-        return f"TwoDCoord({self.hash})"
+        return f"TwoDCoord({self.id})"
 
 
 class Grid(Base):
@@ -107,7 +115,7 @@ class Grid(Base):
                                 secondary=grid_two_d_coord,
                                 backref="grids")
 
-    def __init__(self, cube):
+    def __init__(self, cube, session):
         dim_coords = {}
         non_dim_coords = {}
         dims = {}
@@ -118,9 +126,19 @@ class Grid(Base):
             dims[ax] = cube.coord_dims(axis_dim_coords[0])[0]
             axis_non_dim_coords = cube.coords(axis=ax, dim_coords=False)
             non_dim_coords[ax] = axis_non_dim_coords
+        for coord in dim_coords.values():
+            candidate = DimCoord(coord)
+            candidate = session.get(DimCoord, candidate.id)
+            print(candidate)
+        super().__init__(
+            dim_coords=[DimCoord(coord)
+                        for coord in dim_coords.values()],
+            two_d_coords=[TwoDCoord(coord)
+                          for coord in set(sum(non_dim_coords.values(), []))],
+        )
 
     def __repr__(self):
-        return f"Grid([{', '.join(self.dim_coords)}])"
+        return f"Grid([{', '.join([str(c) for c in self.dim_coords])}])"
 
 
 class File(Base):
@@ -132,12 +150,12 @@ class File(Base):
     grid_id = Column(ForeignKey("grid.id"))
     grid = relationship("Grid", backref="files")
 
-    def __init__(self, path):
+    def __init__(self, path, session):
         cube = iris.load_cube(path)
         super().__init__(
             filename=os.path.basename(path),
             tracking_id=cube.attributes["tracking_id"],
-            grid=Grid(cube),
+            grid=Grid(cube, session),
         )
 
     def __repr__(self):
