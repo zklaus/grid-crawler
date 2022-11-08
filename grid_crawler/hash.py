@@ -48,7 +48,7 @@ def phash_2d(arr, hash_size=8, highfreq_factor=4):
 
 def phash_1d(arr, hash_size=8, highfreq_factor=4):
     img_size = hash_size * highfreq_factor
-    resized = resize(arr, (img_size,), anti_aliasing=True)
+    resized = resize(arr, (img_size, ), anti_aliasing=True)
     transformed = dct(resized, axis=0)
     lowfreq = transformed[:hash_size]
     med = np.median(lowfreq)

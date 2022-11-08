@@ -6,23 +6,14 @@ import os
 from typing import Mapping, NamedTuple
 
 import iris
-from sqlalchemy import (
-    Column,
-    ForeignKey,
-    Integer,
-    PickleType,
-    String,
-    Table,
-    UniqueConstraint,
-    select,
-)
+from sqlalchemy import (Column, ForeignKey, Integer, PickleType, String, Table,
+                        UniqueConstraint, select)
 from sqlalchemy.orm import declarative_base, relationship
 from xxhash import xxh3_64_hexdigest
 
 from .hash import phash_1d, phash_2d
 
 Base = declarative_base()
-
 
 grid_dim_coord = Table(
     "grid_dim_coord",
@@ -64,9 +55,8 @@ def hash_dim_coord(coord):
         bounds_hash = None
         bounds_lower_phash = None
         bounds_upper_phash = None
-    return DimCoordHashes(
-        points_hash, points_phash, bounds_hash, bounds_lower_phash, bounds_upper_phash
-    )
+    return DimCoordHashes(points_hash, points_phash, bounds_hash,
+                          bounds_lower_phash, bounds_upper_phash)
 
 
 def hash_aux_coord(coord):
@@ -92,16 +82,20 @@ def hash_grid(cube):
         dims[ax] = cube.coord_dims(axis_dim_coords[0])[0]
         axis_non_dim_coords = cube.coords(axis=ax, dim_coords=False)
         non_dim_coords[ax] = axis_non_dim_coords
-    dim_coord_hashes = {hash_dim_coord(coord): coord for coord in dim_coords.values()}
+    dim_coord_hashes = {
+        hash_dim_coord(coord): coord
+        for coord in dim_coords.values()
+    }
     two_d_coord_hashes = {
-        hash_aux_coord(coord): coord for coord in set(sum(non_dim_coords.values(), []))
+        hash_aux_coord(coord): coord
+        for coord in set(sum(non_dim_coords.values(), []))
     }
     return GridHashes(dim_coord_hashes, two_d_coord_hashes)
 
 
 class DimCoord(Base):
     __tablename__ = "dim_coord"
-    __table_args__ = (UniqueConstraint("points_hash", "bounds_hash"),)
+    __table_args__ = (UniqueConstraint("points_hash", "bounds_hash"), )
 
     id = Column(Integer, primary_key=True)
     points = Column(PickleType, nullable=False)
@@ -126,7 +120,7 @@ grid_two_d_coord = Table(
 
 class TwoDCoord(Base):
     __tablename__ = "two_d_coord"
-    __table_args__ = (UniqueConstraint("points_hash", "bounds_hash"),)
+    __table_args__ = (UniqueConstraint("points_hash", "bounds_hash"), )
 
     id = Column(Integer, primary_key=True)
     points = Column(PickleType, nullable=False)
@@ -143,10 +137,12 @@ class Grid(Base):
     __tablename__ = "grid"
 
     id = Column(Integer, primary_key=True)
-    dim_coords = relationship("DimCoord", secondary=grid_dim_coord, backref="grids")
-    two_d_coords = relationship(
-        "TwoDCoord", secondary=grid_two_d_coord, backref="grids"
-    )
+    dim_coords = relationship("DimCoord",
+                              secondary=grid_dim_coord,
+                              backref="grids")
+    two_d_coords = relationship("TwoDCoord",
+                                secondary=grid_two_d_coord,
+                                backref="grids")
 
     def __init__(self, cube, session, grid_hashes=None):
         if grid_hashes is None:
@@ -157,14 +153,12 @@ class Grid(Base):
                 select(DimCoord).where(
                     DimCoord.points_hash == candidate.points_hash,
                     DimCoord.bounds_hash == candidate.bounds_hash,
-                )
-            )
+                ))
             if existing is None:
                 dim_coords.append(
-                    DimCoord(
-                        points=coord.points, bounds=coord.bounds, **candidate._asdict()
-                    )
-                )
+                    DimCoord(points=coord.points,
+                             bounds=coord.bounds,
+                             **candidate._asdict()))
             else:
                 dim_coords.append(existing)
         two_d_coords = []
@@ -173,14 +167,12 @@ class Grid(Base):
                 select(TwoDCoord).where(
                     TwoDCoord.points_hash == candidate.points_hash,
                     TwoDCoord.bounds_hash == candidate.bounds_hash,
-                )
-            )
+                ))
             if existing is None:
                 two_d_coords.append(
-                    TwoDCoord(
-                        points=coord.points, bounds=coord.bounds, **candidate._asdict()
-                    )
-                )
+                    TwoDCoord(points=coord.points,
+                              bounds=coord.bounds,
+                              **candidate._asdict()))
             else:
                 two_d_coords.append(existing)
         # unique_dim_coords.append(candidate)
@@ -222,7 +214,8 @@ class File(Base):
         # import pdb; pdb.set_trace()
         # existing = session.scalar(
         #     select(Grid).join(Grid.dim_coords).join(Grid.two_d_coords).where(
-        #         Grid.dim_coords.points_hash.in_([c.points_hash for c in candidate.dim_coords])
+        #         Grid.dim_coords.points_hash.in_(
+        # [c.points_hash for c in candidate.dim_coords])
         #     ))
         # existing = session.get(Grid, candidate.id)
         existing = None

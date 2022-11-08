@@ -4,10 +4,9 @@
 from itertools import islice
 from pathlib import Path
 
+import fire
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-
-import fire
 
 from . import db
 
