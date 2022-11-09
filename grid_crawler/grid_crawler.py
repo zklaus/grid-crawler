@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from itertools import islice
+import time
 from pathlib import Path
 
 import fire
@@ -14,7 +14,7 @@ from . import db
 def setup_db():
     engine = create_engine(
         "sqlite+pysqlite:///grids.db",
-        echo=True,
+        echo=False,
         future=True,
     )
     db.Base.metadata.create_all(engine)
@@ -26,10 +26,13 @@ def crawl(basedir):
     basepath = Path(basedir)
     candidates = basepath.glob("**/*.nc")
     with Session(engine) as session:
-        for candidate in islice(candidates, 10):
+        # for candidate in islice(candidates, 10):
+        start = time.time()
+        for i, candidate in enumerate(candidates):
             filer = db.File(candidate, session)
-            print(filer)
             session.add(filer)
+            now = time.time()
+            print(f"{i} {now-start}")
         session.commit()
 
 

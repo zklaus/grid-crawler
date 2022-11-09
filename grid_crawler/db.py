@@ -7,7 +7,7 @@ from typing import Mapping, NamedTuple
 
 import iris
 from sqlalchemy import (Column, ForeignKey, Integer, PickleType, String, Table,
-                        UniqueConstraint, select)
+                        UniqueConstraint, and_, or_, select)
 from sqlalchemy.orm import declarative_base, relationship
 from xxhash import xxh3_64_hexdigest
 
@@ -126,19 +126,21 @@ class File(Base):
     def __init__(self, path, session):
         cube = iris.load_cube(path)
         candidate = hash_grid(cube)
-        # existing = session.scalar(
-        #     select(Grid).join(Grid.coords).where(
-        #         Grid.coords.points_hash.in_(
-        #             [c.points_hash for c in candidate.coords])
-        #     ))
-        # existing = session.get(Grid, candidate.id)
-        existing = None
-        if existing is not None:
-            candidate = existing
+        coord_subq = session.scalars(
+            select(Coord).where(
+                or_(*[
+                    and_(Coord.points_hash == c.points_hash, Coord.bounds_hash
+                         == c.bounds_hash) for c in candidate.coords
+                ])))
+        existing = session.scalar(
+            select(Grid).join(Grid.coords).where(
+                or_(*[Grid.coords.contains(c) for c in coord_subq])))
+        if existing is None:
+            existing = Grid(cube, session, candidate)
         super().__init__(
             filename=os.path.basename(path),
             tracking_id=cube.attributes["tracking_id"],
-            grid=Grid(cube, session, candidate),
+            grid=existing,
         )
 
     def __repr__(self):
