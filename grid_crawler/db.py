@@ -128,6 +128,15 @@ class File(Base):
     @classmethod
     def from_path(cls, path, session):
         cube = iris.load_cube(path)
+        filename = os.path.basename(path)
+        tracking_id = cube.attributes["tracking_id"]
+        existing_file = session.scalar(
+            select(File).where(
+                File.filename == filename,
+                File.tracking_id == tracking_id,
+            ))
+        if existing_file:
+            return existing_file
         candidate = hash_grid(cube)
         coord_subq = session.scalars(
             select(Coord).where(
