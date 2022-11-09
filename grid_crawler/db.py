@@ -91,7 +91,8 @@ class Grid(Base):
     id = Column(Integer, primary_key=True)
     coords = relationship("Coord", secondary=grid_coord, backref="grids")
 
-    def __init__(self, cube, session, grid_hashes=None):
+    @classmethod
+    def from_cube(cls, cube, session, grid_hashes=None):
         if grid_hashes is None:
             grid_hashes = hash_grid(cube)
         coords = []
@@ -108,7 +109,7 @@ class Grid(Base):
                           **candidate._asdict()))
             else:
                 coords.append(existing)
-        super().__init__(coords=coords)
+        return cls(coords=coords)
 
     def __repr__(self):
         return f"Grid([{', '.join([str(c) for c in self.coords])}])"
@@ -116,6 +117,7 @@ class Grid(Base):
 
 class File(Base):
     __tablename__ = "file"
+    __table_args__ = (UniqueConstraint("filename", "tracking_id"), )
 
     id = Column(Integer, primary_key=True)
     filename = Column(String, nullable=False)
@@ -123,7 +125,8 @@ class File(Base):
     grid_id = Column(ForeignKey("grid.id"))
     grid = relationship("Grid", backref="files")
 
-    def __init__(self, path, session):
+    @classmethod
+    def from_path(cls, path, session):
         cube = iris.load_cube(path)
         candidate = hash_grid(cube)
         coord_subq = session.scalars(
@@ -136,8 +139,8 @@ class File(Base):
             select(Grid).join(Grid.coords).where(
                 or_(*[Grid.coords.contains(c) for c in coord_subq])))
         if existing is None:
-            existing = Grid(cube, session, candidate)
-        super().__init__(
+            existing = Grid.from_cube(cube, session, candidate)
+        return cls(
             filename=os.path.basename(path),
             tracking_id=cube.attributes["tracking_id"],
             grid=existing,

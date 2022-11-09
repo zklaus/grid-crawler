@@ -29,7 +29,7 @@ def crawl(basedir):
         # for candidate in islice(candidates, 10):
         start = time.time()
         for i, candidate in enumerate(candidates):
-            filer = db.File(candidate, session)
+            filer = db.File.from_path(candidate, session)
             session.add(filer)
             now = time.time()
             print(f"{i} {now-start}")
