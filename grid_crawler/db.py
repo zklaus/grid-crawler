@@ -141,8 +141,10 @@ class File(Base):
         coord_subq = session.scalars(
             select(Coord).where(
                 or_(*[
-                    and_(Coord.points_hash == c.points_hash, Coord.bounds_hash
-                         == c.bounds_hash) for c in candidate.coords
+                    and_(
+                        Coord.points_hash == c.points_hash,
+                        Coord.bounds_hash == c.bounds_hash,
+                    ) for c in candidate.coords
                 ])))
         existing = session.scalar(
             select(Grid).join(Grid.coords).where(
