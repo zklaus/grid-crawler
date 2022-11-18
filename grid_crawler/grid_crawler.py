@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import logging
 import time
 from itertools import chain
 from pathlib import Path
@@ -10,6 +11,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from . import db
+
+logging.basicConfig()
+
+logger = logging.getLogger(__name__)
 
 
 def setup_db():
@@ -30,10 +35,18 @@ def crawl(*basedirs):
         # for candidate in islice(candidates, 10):
         start = time.time()
         for i, candidate in enumerate(candidates):
-            filer = db.File.from_path(candidate, session)
-            session.add(filer)
-            now = time.time()
-            print(f"{i} {now-start}")
+            try:
+                filer = db.File.from_path(candidate, session)
+            except Exception as e:
+                logger.debug("Could not process file %s",
+                             candidate,
+                             exc_info=e)
+            else:
+                session.add(filer)
+                now = time.time()
+                print(f"{i} {now-start}")
+                if i % 10 == 0:
+                    session.commit()
         session.commit()
 
 
