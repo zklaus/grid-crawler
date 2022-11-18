@@ -74,7 +74,7 @@ class Coord(Base):
     bounds_hash = Column(Integer)
 
     def __repr__(self):
-        return f"Coord({self.id})"
+        return f"Coord({self.points_hash}, {self.bounds_hash})"
 
 
 grid_coord = Table(
