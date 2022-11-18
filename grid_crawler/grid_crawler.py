@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import time
+from itertools import chain
 from pathlib import Path
 
 import fire
@@ -21,10 +22,10 @@ def setup_db():
     return engine
 
 
-def crawl(basedir):
+def crawl(*basedirs):
     engine = setup_db()
-    basepath = Path(basedir)
-    candidates = basepath.glob("**/*.nc")
+    candidates = chain.from_iterable(
+        Path(basedir).glob("**/*.nc") for basedir in basedirs)
     with Session(engine) as session:
         # for candidate in islice(candidates, 10):
         start = time.time()
