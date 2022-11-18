@@ -138,17 +138,20 @@ class File(Base):
         if existing_file:
             return existing_file
         candidate = hash_grid(cube)
-        coord_subq = session.scalars(
+        existing_coords = session.scalars(
             select(Coord).where(
                 or_(*[
                     and_(
                         Coord.points_hash == c.points_hash,
                         Coord.bounds_hash == c.bounds_hash,
                     ) for c in candidate.coords
-                ])))
-        existing = session.scalar(
-            select(Grid).join(Grid.coords).where(
-                or_(*[Grid.coords.contains(c) for c in coord_subq])))
+                ]))).all()
+        if len(existing_coords) == len(candidate.coords):
+            existing = session.scalar(
+                select(Grid).join(Grid.coords).where(
+                    *[Grid.coords.contains(c) for c in existing_coords]))
+        else:
+            existing = None
         if existing is None:
             existing = Grid.from_cube(cube, session, candidate)
         return cls(
