@@ -129,7 +129,7 @@ class File(Base):
     def from_path(cls, path, session):
         cube = iris.load_cube(path)
         filename = os.path.basename(path)
-        tracking_id = cube.attributes["tracking_id"]
+        tracking_id = cube.attributes.pop("tracking_id", None)
         existing_file = session.scalar(
             select(File).where(
                 File.filename == filename,
@@ -152,8 +152,8 @@ class File(Base):
         if existing is None:
             existing = Grid.from_cube(cube, session, candidate)
         return cls(
-            filename=os.path.basename(path),
-            tracking_id=cube.attributes["tracking_id"],
+            filename=filename,
+            tracking_id=tracking_id,
             grid=existing,
         )
 
